@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş - Rework Calculator</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0f172a;
+            background-image: radial-gradient(at 0% 0%, #1e293b 0px, transparent 50%), 
+                              radial-gradient(at 100% 100%, #330a0f 0px, transparent 50%);
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .login-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .brand-logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            letter-spacing: -1px;
+        }
+        .brand-logo span { color: #ef4444; } /* THY Kırmızısı */
+
+        .input-group { margin-bottom: 15px; text-align: left; }
+        
+        label { font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 5px; }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s;
+            margin-top: 10px;
+        }
+
+        .btn-login {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+        .btn-login:hover { background: #dc2626; }
+
+        .btn-register {
+            background: transparent;
+            color: #94a3b8;
+            border: 1px solid #334155;
+        }
+        .btn-register:hover { background: rgba(255,255,255,0.05); color: white; }
+
+        .message {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            min-height: 20px;
+        }
+        .error { color: #f87171; }
+        .success { color: #4ade80; }
+
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="brand-logo">FIELD<span>CALC</span></div>
+        
+        <div class="input-group">
+            <label>Kurumsal Email</label>
+            <input type="email" id="email" placeholder="kullanici@thy.com">
+        </div>
+        
+        <div class="input-group">
+            <label>Şifre</label>
+            <input type="password" id="password" placeholder="••••••••">
+        </div>
+
+        <button class="btn-login" onclick="login()">GİRİŞ YAP</button>
+        <button class="btn-register" onclick="register()">KAYIT OL</button>
+
+        <div id="msg" class="message"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCx2X80ULWnKEm7oOnBH_VCRZKypSgHPnk",
+            authDomain: "reworkfieldcalc.firebaseapp.com",
+            projectId: "reworkfieldcalc",
+            storageBucket: "reworkfieldcalc.firebasestorage.app",
+            messagingSenderId: "557943426846",
+            appId: "1:557943426846:web:8d2a87e86741aab0d0830f",
+            measurementId: "G-B96HKNTZ95"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        const msg = document.getElementById('msg');
+
+        function showMsg(text, type) {
+            msg.innerText = text;
+            msg.className = 'message ' + type;
+        }
+
+        function register() {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+
+            if (!email.endsWith('@thy.com')) {
+                showMsg("Sadece @thy.com uzantısı kabul edilir.", "error");
+                return;
+            }
+            if (pass.length < 6) {
+                showMsg("Şifre en az 6 karakter olmalıdır.", "error");
+                return;
+            }
+
+            auth.createUserWithEmailAndPassword(email, pass)
+                .then(() => {
+                    showMsg("Kayıt başarılı! Yönlendiriliyorsunuz...", "success");
+                    setTimeout(() => window.location.href = "index.html", 1500);
+                })
+                .catch((err) => showMsg(err.message, "error"));
+        }
+
+        function login() {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+
+            auth.signInWithEmailAndPassword(email, pass)
+                .then((cred) => {
+                    if (!cred.user.email.endsWith('@thy.com')) {
+                        auth.signOut();
+                        showMsg("Yetkisiz email uzantısı.", "error");
+                        return;
+                    }
+                    window.location.href = "index.html";
+                })
+                .catch(() => showMsg("Email veya şifre hatalı.", "error"));
+        }
+
+        // Zaten giriş yapmışsa direkt yönlendir
+        auth.onAuthStateChanged((user) => {
+            if (user && user.email.endsWith('@thy.com')) {
+                window.location.href = "index.html";
+            }
+        });
+    </script>
+</body>
+</html>

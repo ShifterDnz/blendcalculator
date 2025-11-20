@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Patch Calculator</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.8);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-color: #ef4444; /* THY Kırmızı */
+            --boeing-blue: #0039a6;
+            --airbus-blue: #00205b;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            flex-direction: column;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--accent-color); border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Sidebar */
+        .sidebar {
+            width: 360px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; padding: 20px;
+            box-shadow: 5px 0 25px rgba(0,0,0,0.2); z-index: 20;
+        }
+
+        .header { font-weight: 800; font-size: 1.2rem; margin-bottom: 20px; letter-spacing: -0.5px; }
+        .header span { color: var(--accent-color); }
+
+        /* Mod Switcher */
+        .mode-switch {
+            display: flex; background: rgba(0,0,0,0.3); padding: 4px;
+            border-radius: 8px; margin-bottom: 20px;
+        }
+        .mode-btn {
+            flex: 1; padding: 8px; border: none; border-radius: 6px;
+            cursor: pointer; font-weight: 600; color: var(--text-muted);
+            background: transparent; transition: all 0.2s;
+        }
+        .mode-btn.active-boeing { background: var(--boeing-blue); color: white; box-shadow: 0 2px 10px rgba(0,57,166,0.4); }
+        .mode-btn.active-airbus { background: var(--airbus-blue); color: white; box-shadow: 0 2px 10px rgba(0,32,91,0.4); }
+
+        /* Inputs */
+        .control-group { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 20px; }
+        .input-wrap { flex: 1; }
+        .input-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px; display: block; }
+        
+        input[type="number"] {
+            width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color);
+            color: white; padding: 8px; border-radius: 6px; font-weight: bold; font-family: inherit;
+        }
+        input:focus { outline: none; border-color: var(--accent-color); }
+
+        button.btn-reset {
+            background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 8px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; height: 36px;
+        }
+        button.btn-reset:hover { background: #ef4444; color: white; }
+
+        /* List Area */
+        .points-list { flex: 1; overflow-y: auto; padding-right: 5px; }
+        .point-item {
+            background: rgba(255,255,255,0.03); border-radius: 6px; padding: 10px; margin-bottom: 8px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-left: 3px solid var(--accent-color);
+        }
+        .connector {
+            margin-left: 13px; padding-left: 15px; border-left: 1px dashed var(--text-muted);
+            padding-bottom: 8px; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .connector input { width: 70px; padding: 4px; text-align: center; font-size: 0.9rem; }
+
+        /* Results */
+        .result-card {
+            background: rgba(0,0,0,0.4); border: 1px solid var(--border-color);
+            padding: 15px; border-radius: 12px; text-align: center; margin-top: 15px;
+        }
+        .result-value { font-size: 2.5rem; font-weight: 800; display: block; line-height: 1; margin: 10px 0; }
+        .badge {
+            display: inline-block; padding: 6px 12px; border-radius: 20px;
+            font-size: 0.8rem; font-weight: 700; letter-spacing: 0.5px;
+        }
+        .badge.safe { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .badge.unsafe { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        /* Canvas */
+        .canvas-area { flex: 1; position: relative; background: #0f172a; cursor: crosshair; overflow: hidden; }
+        .grid { position: absolute; width: 100%; height: 100%; opacity: 0.15; pointer-events: none; }
+        .info-box {
+            position: absolute; bottom: 20px; left: 20px;
+            background: rgba(15, 23, 42, 0.9); padding: 10px 15px; border-radius: 8px;
+            border: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        #logoutBtn {
+            position: absolute; top: 20px; right: 20px; z-index: 100;
+            background: rgba(0,0,0,0.5); color: #ccc; border: 1px solid var(--border-color);
+            padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+        }
+        #logoutBtn:hover { background: #ef4444; color: white; border-color: #ef4444; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <!-- Loading Overlay -->
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <div style="font-size: 0.9rem; color: #94a3b8;">Yetki Kontrolü...</div>
+    </div>
+
+    <button id="logoutBtn" onclick="logout()">ÇIKIŞ YAP</button>
+
+    <div class="sidebar">
+        <div class="header">FIELD<span>CALC</span></div>
+        
+        <div class="mode-switch">
+            <button class="mode-btn active-boeing" id="btnBoeing" onclick="setMode('boeing')">BOEING</button>
+            <button class="mode-btn" id="btnAirbus" onclick="setMode('airbus')">AIRBUS</button>
+        </div>
+
+        <div class="control-group">
+            <div class="input-wrap">
+                <span class="input-label">Limit (<span id="limitUnitLabel">in²</span>)</span>
+                <input type="number" id="limitInput" value="5.00" step="0.01" oninput="redraw()">
+            </div>
+            <button class="btn-reset" onclick="resetShape()">SIFIRLA</button>
+        </div>
+
+        <div class="points-list" id="pointsList">
+            <div style="text-align:center; margin-top:50px; color:var(--text-muted); font-size:0.9rem;">
+                Şekil oluşturmak için<br>alan üzerine tıklayın.
+            </div>
+        </div>
+
+        <div class="result-card">
+            <span style="font-size:0.8rem; color:var(--text-muted)">TOPLAM ALAN</span>
+            <span class="result-value" id="areaText">0.00</span>
+            <span style="font-size:0.75rem; color:var(--text-muted)" id="resultUnitLabel">Square Inch</span>
+            <div style="margin-top:15px;">
+                <div id="statusBadge" class="badge safe" style="display:none">UYGUN</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-area" id="canvasWrapper">
+        <div class="grid" id="gridLayer"></div>
+        <canvas id="mainCanvas"></canvas>
+        <div class="info-box">
+            <div id="gridInfoText" style="color:white; font-weight:600; margin-bottom:4px;">Grid: 0.5"</div>
+            Nokta Taşı: <b style="color:white">CTRL + Sürükle</b>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCx2X80ULWnKEm7oOnBH_VCRZKypSgHPnk",
+            authDomain: "reworkfieldcalc.firebaseapp.com",
+            projectId: "reworkfieldcalc",
+            storageBucket: "reworkfieldcalc.firebasestorage.app",
+            messagingSenderId: "557943426846",
+            appId: "1:557943426846:web:8d2a87e86741aab0d0830f",
+            measurementId: "G-B96HKNTZ95"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // FLICKER ÇÖZÜMÜ BURADA
+        auth.onAuthStateChanged((user) => {
+            const loader = document.getElementById('loading-screen');
+            if (user && user.email.endsWith('@thy.com')) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
+            } else {
+                window.location.href = "login.html";
+            }
+        });
+
+        function logout() {
+            auth.signOut().then(() => window.location.href = "login.html");
+        }
+
+        // Güvenlik (Inspect Engelleme)
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function(e) {
+            if(e.keyCode == 123) return false;
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+            if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+        }
+    </script>
+
+    <!-- Hesaplama Kodları -->
+    <script src="app.js"></script>
+</body>
+</html>
